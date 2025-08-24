@@ -37,12 +37,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const progressSaveIntervalRef = useRef<number | null>(null);
   const timeOffsetRef = useRef(initialSeekTime);
   
-  // Cast state and refs
-  const remotePlayer = useRef<any>(null);
-  const remotePlayerController = useRef<any>(null);
-  const [castState, setCastState] = useState<string>('NO_DEVICES_AVAILABLE');
-  const [castDeviceName, setCastDeviceName] = useState('');
-  const [isCasting, setIsCasting] = useState(false);
   const [selectedAudioLanguage, setSelectedAudioLanguage] = useState('en');
 
   const getUrlWithTime = (baseUrl: string, time: number) => {
@@ -84,11 +78,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const currentTimeRef = useRef(currentTime);
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
-
-  const mediaInfoRef = useRef({ url: urlTemplate, mainTitle, subtitle, currentTime, totalDuration, isPlaying });
-  useEffect(() => {
-    mediaInfoRef.current = { url: urlTemplate, mainTitle, subtitle, currentTime, totalDuration, isPlaying };
-  }, [urlTemplate, mainTitle, subtitle, currentTime, totalDuration, isPlaying]);
 
   useEffect(() => {
     const originalTitle = document.title;
@@ -150,135 +139,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   useEffect(() => {
-    let castContext: any = null;
-    let remotePlayerListener: (() => void) | null = null;
-    let castStateListener: ((event: any) => void) | null = null;
-    let sessionStateListener: ((event: any) => void) | null = null;
-
-    const loadRemoteMedia = (session: any) => {
-        const { url: currentUrlTemplate, mainTitle: currentTitle, subtitle: currentSubtitle } = mediaInfoRef.current;
-        const localTime = playerRef.current ? playerRef.current.time() : mediaInfoRef.current.currentTime;
-        const mediaUrl = getUrlWithTime(currentUrlTemplate.replace('{audio}', selectedAudioLanguage), 0).split('?')[0];
-
-        const mediaInfo = new (window as any).chrome.cast.media.MediaInfo(mediaUrl, 'application/dash+xml');
-        mediaInfo.metadata = new (window as any).chrome.cast.media.GenericMediaMetadata();
-        mediaInfo.metadata.title = currentTitle;
-        mediaInfo.metadata.subtitle = currentSubtitle;
-        
-        const request = new (window as any).chrome.cast.media.LoadRequest(mediaInfo);
-        request.currentTime = localTime;
-        request.autoplay = mediaInfoRef.current.isPlaying;
-
-        session.loadMedia(request).then(
-          () => { 
-            playerRef.current?.pause();
-            setIsCasting(true);
-          },
-          (errorCode: any) => {
-            console.error('Error loading media on cast device:', errorCode);
-            setError('Could not cast the video. Please try again.');
-            setIsCasting(false);
-          }
-        );
-    };
-
-    const initializeCastApi = () => {
-        const cast = (window as any).cast;
-        if (!cast) return;
-        const chrome = (window as any).chrome;
-        castContext = cast.framework.CastContext.getInstance();
-      
-        castContext.setOptions({
-            receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
-            autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
-        });
-
-        remotePlayer.current = new cast.framework.RemotePlayer();
-        remotePlayerController.current = new cast.framework.RemotePlayerController(remotePlayer.current);
-      
-        const updateStateFromRemote = () => {
-            if (!remotePlayer.current) return;
-            setIsPlaying(!remotePlayer.current.isPaused);
-            setCurrentTime(remotePlayer.current.currentTime);
-            if (remotePlayer.current.duration > 0) setTotalDuration(remotePlayer.current.duration);
-            if (isFinite(remotePlayer.current.currentTime) && isFinite(remotePlayer.current.duration) && remotePlayer.current.duration > 0) {
-                setProgress((remotePlayer.current.currentTime / remotePlayer.current.duration) * 100);
-            }
-            setVolume(remotePlayer.current.volumeLevel);
-            setIsMuted(remotePlayer.current.isMuted);
-        };
-
-        remotePlayerListener = () => updateStateFromRemote();
-        remotePlayerController.current.addEventListener(cast.framework.RemotePlayerEventType.ANY_CHANGE, remotePlayerListener);
-
-        castStateListener = (event: any) => setCastState(event.castState);
-        sessionStateListener = (event: any) => {
-            const session = castContext.getCurrentSession();
-            const sessionActive = !!session;
-            setIsCasting(sessionActive);
-            setCastDeviceName(session?.getCastDevice().friendlyName || '');
-            
-            if (event.sessionState === 'SESSION_STARTED') {
-                loadRemoteMedia(session);
-            } else if (event.sessionState === 'SESSION_RESUMED') {
-                updateStateFromRemote();
-                playerRef.current?.pause();
-            } else if (event.sessionState === 'SESSION_ENDED') {
-                const lastCastTime = remotePlayer.current.currentTime;
-                if (videoRef.current && lastCastTime > 0 && lastCastTime < mediaInfoRef.current.totalDuration - 5) {
-                    timeOffsetRef.current = lastCastTime;
-                    setStreamInfo({ manifestUrl: getUrlWithTime(mediaInfoRef.current.url.replace('{audio}', selectedAudioLanguage), lastCastTime), seekTime: lastCastTime });
-                }
-            }
-        };
-
-        castContext.addEventListener(cast.framework.CastContextEventType.CAST_STATE_CHANGED, castStateListener);
-        castContext.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, sessionStateListener);
-
-        const session = castContext.getCurrentSession();
-        if (session) {
-            setIsCasting(true);
-            setCastDeviceName(session.getCastDevice().friendlyName);
-            updateStateFromRemote();
-        }
-    };
-    
-    if ((window as any).cast?.framework) {
-        initializeCastApi();
-    } else {
-      (window as any)['__onGCastApiAvailable'] = (isAvailable: boolean) => {
-        if (isAvailable) initializeCastApi();
-      };
-    }
-
-    return () => {
-        const cast = (window as any).cast;
-        if (castContext) {
-            if (castStateListener) castContext.removeEventListener(cast.framework.CastContextEventType.CAST_STATE_CHANGED, castStateListener);
-            if (sessionStateListener) castContext.removeEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, sessionStateListener);
-        }
-        if (remotePlayerController.current && remotePlayerListener) {
-            remotePlayerController.current.removeEventListener(cast.framework.RemotePlayerEventType.ANY_CHANGE, remotePlayerListener);
-        }
-    }
-  }, []);
-
-
-  useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
 
   useEffect(() => {
-    if (isCasting) {
-      if (playerRef.current) {
-        playerRef.current.destroy();
-        playerRef.current = null;
-      }
-      return;
-    }
-    
     if (!videoRef.current || typeof dashjs === 'undefined') return;
 
     if (!streamInfo.manifestUrl) {
@@ -434,7 +300,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
       playerRef.current = null;
     };
-  }, [streamInfo.manifestUrl, isCasting]);
+  }, [streamInfo.manifestUrl]);
 
   const hideControls = () => {
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -464,9 +330,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       handleReplay();
       return;
     }
-    if (isCasting) {
-      remotePlayerController.current.playOrPause();
-    } else if (playerRef.current) {
+    if (playerRef.current) {
       if (isPlaying) playerRef.current.pause();
       else playerRef.current.play();
     }
@@ -486,30 +350,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (totalDuration <= 0) return;
     const newTime = (progress / 100) * totalDuration;
     
-    if (isCasting) {
-      remotePlayer.current.currentTime = newTime;
-      remotePlayerController.current.seek();
-    } else {
-      timeOffsetRef.current = newTime;
-      setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), newTime), seekTime: newTime });
-      setCurrentTime(newTime);
-      saveProgress(false, newTime);
-    }
+    timeOffsetRef.current = newTime;
+    setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), newTime), seekTime: newTime });
+    setCurrentTime(newTime);
+    saveProgress(false, newTime);
   };
 
   const handleSkip = (amount: number) => {
     if (totalDuration > 0) {
       const newTime = Math.max(0, Math.min(totalDuration, currentTime + amount));
-      if (isCasting) {
-        remotePlayer.current.currentTime = newTime;
-        remotePlayerController.current.seek();
-      } else {
-        timeOffsetRef.current = newTime;
-        setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), newTime), seekTime: newTime });
-        setCurrentTime(newTime);
-        setProgress((newTime / totalDuration) * 100);
-        saveProgress(false, newTime);
-      }
+      timeOffsetRef.current = newTime;
+      setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), newTime), seekTime: newTime });
+      setCurrentTime(newTime);
+      setProgress((newTime / totalDuration) * 100);
+      saveProgress(false, newTime);
     }
   };
 
@@ -517,14 +371,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsFinished(false);
     setIsLoading(true);
     setIsPlaying(true);
-    if(isCasting) {
-        remotePlayer.current.currentTime = 0;
-        remotePlayerController.current.seek();
-        remotePlayerController.current.playOrPause();
-    } else {
-        timeOffsetRef.current = 0;
-        setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), 0), seekTime: 0 });
-    }
+    timeOffsetRef.current = 0;
+    setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), 0), seekTime: 0 });
   };
 
   const handleToggleFullscreen = () => {
@@ -555,10 +403,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsMuted(newVolume === 0);
     if (newVolume > 0) setLastVolume(newVolume);
 
-    if (isCasting) {
-      remotePlayer.current.volumeLevel = newVolume;
-      remotePlayerController.current.setVolumeLevel();
-    } else if (playerRef.current) {
+    if (playerRef.current) {
       playerRef.current.setVolume(newVolume);
     }
   };
@@ -566,9 +411,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    if (isCasting) {
-      remotePlayerController.current.muteOrUnmute();
-    } else if (playerRef.current) {
+    if (playerRef.current) {
       if (newMutedState) {
           setLastVolume(volume);
           setVolume(0);
@@ -582,15 +425,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handlePlaybackRateChange = (rate: number) => {
-    if (!isCasting && playerRef.current) {
+    if (playerRef.current) {
       playerRef.current.setPlaybackRate(rate);
       setPlaybackRate(rate);
     }
-    // Note: Playback rate is not supported by the default cast receiver
   };
   
   const handleQualityChange = (index: number) => {
-    if (!isCasting && playerRef.current) {
+    if (playerRef.current) {
         if (index === -1) {
              playerRef.current.updateSettings({ streaming: { abr: { autoSwitchBitrate: { video: true } } } });
         } else {
@@ -602,7 +444,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
   
   const handleTextTrackChange = (track: MediaInfo | null) => {
-    if (!isCasting && playerRef.current) {
+    if (playerRef.current) {
         if(track) {
             const trackIdx = textTracks.findIndex(t => t.id === track.id);
             if (trackIdx !== -1) {
@@ -617,24 +459,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handleAudioLanguageChange = (langKey: string) => {
-    if (urlTemplate && !isCasting) {
+    if (urlTemplate) {
         const newTime = currentTimeRef.current;
         setSelectedAudioLanguage(langKey);
         // Setting streamInfo will trigger the useEffect to re-initialize the player
         timeOffsetRef.current = newTime;
         setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', langKey), newTime), seekTime: newTime });
-    }
-  };
-  
-  const handleCastClick = () => {
-    const cast = (window as any).cast;
-    if (!cast) return;
-    const castContext = cast.framework.CastContext.getInstance();
-    const session = castContext.getCurrentSession();
-    if (session) {
-      castContext.endCurrentSession(true);
-    } else {
-      castContext.requestSession();
     }
   };
 
@@ -651,16 +481,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onMouseMove={showControls}
       onClick={showControls}
     >
-      <video ref={videoRef} className={`w-full h-full object-contain pointer-events-none ${isCasting ? 'opacity-0' : ''}`} autoPlay />
+      <video ref={videoRef} className="w-full h-full object-contain pointer-events-none" autoPlay />
       
-      {isCasting && castDeviceName && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 z-10 text-white">
-          <span className="material-symbols-outlined text-white animate-pulse text-[6rem]">cast</span>
-          <p className="mt-4 text-2xl font-semibold">Casting to</p>
-          <p className="text-lg text-gray-300">{castDeviceName}</p>
-        </div>
-      )}
-
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-80 z-30 text-white text-center p-4 cursor-default">
           <h2 className="text-2xl font-bold text-red-500 mb-4">Playback Error</h2>
@@ -683,7 +505,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       {!error && (
         <div onClick={e => e.stopPropagation()} className="w-full h-full absolute inset-0 cursor-default pointer-events-none">
           <PlayerControls
-            isLoading={isLoading && !isCasting}
+            isLoading={isLoading}
             isFinished={isFinished}
             progress={progress}
             onSeekChange={handleSeekChange}
@@ -714,9 +536,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onTextTrackChange={handleTextTrackChange}
             isFullscreen={isFullscreen}
             onToggleFullscreen={handleToggleFullscreen}
-            isCasting={isCasting}
-            castState={castState}
-            onCastClick={handleCastClick}
             audioLanguages={audioLanguages}
             selectedAudioLanguage={selectedAudioLanguage}
             onAudioLanguageChange={handleAudioLanguageChange}

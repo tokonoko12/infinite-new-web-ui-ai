@@ -33,9 +33,6 @@ interface PlayerControlsProps {
     onTextTrackChange: (track: MediaInfo | null) => void;
     isFullscreen: boolean;
     onToggleFullscreen: () => void;
-    isCasting: boolean;
-    castState: any; 
-    onCastClick: () => void;
     audioLanguages: Record<string, string> | null;
     selectedAudioLanguage: string;
     onAudioLanguageChange: (langKey: string) => void;
@@ -59,21 +56,18 @@ const formatTime = (timeInSeconds: number) => {
 const SettingsMenu: React.FC<{
     playbackRate: number, onPlaybackRateChange: (r: number) => void, availablePlaybackRates: number[],
     textTracks: MediaInfo[], currentTextTrack: MediaInfo | null, onTextTrackChange: (t: MediaInfo | null) => void,
-    audioLanguages: Record<string, string> | null, selectedAudioLanguage: string, onAudioLanguageChange: (langKey: string) => void,
-    isCasting: boolean
-}> = ({ playbackRate, onPlaybackRateChange, availablePlaybackRates, textTracks, currentTextTrack, onTextTrackChange, audioLanguages, selectedAudioLanguage, onAudioLanguageChange, isCasting }) => {
+    audioLanguages: Record<string, string> | null, selectedAudioLanguage: string, onAudioLanguageChange: (langKey: string) => void
+}> = ({ playbackRate, onPlaybackRateChange, availablePlaybackRates, textTracks, currentTextTrack, onTextTrackChange, audioLanguages, selectedAudioLanguage, onAudioLanguageChange }) => {
     const [activeMenu, setActiveMenu] = useState('main');
 
     const MainMenu = () => {
         return (
             <>
-                {!isCasting && <button onClick={() => setActiveMenu('speed')} className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 rounded">Playback Speed <span className="text-gray-400 float-right">{playbackRate === 1 ? 'Normal' : `${playbackRate}x`} &gt;</span></button>}
-                {!isCasting && audioLanguages && Object.keys(audioLanguages).length > 1 && (
+                <button onClick={() => setActiveMenu('speed')} className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 rounded">Playback Speed <span className="text-gray-400 float-right">{playbackRate === 1 ? 'Normal' : `${playbackRate}x`} &gt;</span></button>
+                {audioLanguages && Object.keys(audioLanguages).length > 1 && (
                    <button onClick={() => setActiveMenu('audio')} className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 rounded">Audio <span className="text-gray-400 float-right">{audioLanguages[selectedAudioLanguage] || selectedAudioLanguage} &gt;</span></button>
                 )}
-                {!isCasting && <button onClick={() => setActiveMenu('subtitles')} className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 rounded">Subtitles/CC <span className="text-gray-400 float-right">{currentTextTrack ? currentTextTrack.lang : 'Off'} &gt;</span></button>}
-                {isCasting && <p className="px-4 py-2 text-sm text-gray-400">Settings not available while casting.</p>}
-
+                <button onClick={() => setActiveMenu('subtitles')} className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 rounded">Subtitles/CC <span className="text-gray-400 float-right">{currentTextTrack ? currentTextTrack.lang : 'Off'} &gt;</span></button>
             </>
         );
     };
@@ -106,7 +100,7 @@ const SettingsMenu: React.FC<{
 };
 
 const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
-    const { isVisible, isLoading, mainTitle, subtitle, onClose, onPlayPause, isPlaying, onSkipBack, onSkipForward, progress, buffer, onSeekChange, onSeekCommit, currentTime, duration, volume, isMuted, onMuteToggle, onVolumeChange, onToggleFullscreen, isFullscreen, isCasting, castState, onCastClick } = props;
+    const { isVisible, isLoading, mainTitle, subtitle, onClose, onPlayPause, isPlaying, onSkipBack, onSkipForward, progress, buffer, onSeekChange, onSeekCommit, currentTime, duration, volume, isMuted, onMuteToggle, onVolumeChange, onToggleFullscreen, isFullscreen } = props;
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const volumeButtonRef = useRef<HTMLDivElement>(null);
     const settingsButtonRef = useRef<HTMLDivElement>(null);
@@ -245,11 +239,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4">
-                        {castState !== 'NO_DEVICES_AVAILABLE' && (
-                            <button onClick={onCastClick} className={`p-2 hover:bg-white/20 rounded-full transition-colors ${isCasting ? 'text-sky-400' : ''}`} aria-label="Cast to device">
-                                <span className="material-symbols-outlined text-2xl">cast</span>
-                            </button>
-                        )}
                         <button onClick={onToggleFullscreen} className="p-2 hover:bg-white/20 rounded-full" aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
                             <span className="material-symbols-outlined text-2xl">{isFullscreen ? 'fullscreen_exit' : 'fullscreen'}</span>
                         </button>
