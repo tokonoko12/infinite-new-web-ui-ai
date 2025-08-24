@@ -124,7 +124,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
                     </div>
                 </div>
                 <div className="relative" ref={settingsButtonRef}>
-                    <button onClick={() => setIsSettingsOpen(o => !o)} className="p-2 hover:bg-white/20 rounded-full" aria-label="Settings">
+                    <button onClick={() => setIsSettingsOpen(o => !o)} disabled={isLoading} className="p-2 hover:bg-white/20 rounded-full disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Settings">
                         <span className="material-symbols-outlined text-2xl">settings</span>
                     </button>
                     {isSettingsOpen && <SettingsMenu {...props} />}
@@ -133,7 +133,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
             
             {/* Center Controls */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-x-8 sm:gap-x-16 pointer-events-auto">
-                <button onClick={onSkipBack} className="p-2 bg-black/40 rounded-full hover:bg-white/20 transition-colors backdrop-blur-sm" aria-label="Skip back 10 seconds">
+                <button onClick={onSkipBack} disabled={isLoading} className="p-2 bg-black/40 rounded-full hover:bg-white/20 transition-colors backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Skip back 10 seconds">
                     <span className="material-symbols-outlined text-4xl sm:text-5xl">replay_10</span>
                 </button>
                 <div className="relative flex items-center justify-center w-24 h-24 sm:w-32 sm:h-32">
@@ -160,7 +160,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
                         <span className="material-symbols-outlined text-5xl sm:text-6xl">{isPlaying ? 'pause' : 'play_arrow'}</span>
                     </button>
                 </div>
-                <button onClick={onSkipForward} className="p-2 bg-black/40 rounded-full hover:bg-white/20 transition-colors backdrop-blur-sm" aria-label="Skip forward 10 seconds">
+                <button onClick={onSkipForward} disabled={isLoading} className="p-2 bg-black/40 rounded-full hover:bg-white/20 transition-colors backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Skip forward 10 seconds">
                     <span className="material-symbols-outlined text-4xl sm:text-5xl">forward_10</span>
                 </button>
             </div>
@@ -174,44 +174,24 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
                         <span>{formatTime(currentTime)}</span>
                         <span>{formatTime(duration)}</span>
                     </div>
-                    <div className="group relative">
+                    <div className="group relative h-1.5 group-hover:h-2 transition-all duration-200">
+                        {/* Base track */}
+                        <div className="absolute w-full h-full bg-white/30 rounded-full" />
+                        {/* Buffer track */}
+                        <div className="absolute h-full bg-white/50 rounded-full" style={{ width: `${buffer}%` }} />
+                        {/* Progress/Seek track */}
+                        <div className="absolute h-full bg-white rounded-full" style={{ width: `${progress}%` }} />
                         <input
                             type="range"
                             min="0"
                             max="100"
                             value={progress}
+                            disabled={isLoading}
                             onChange={onSeekChange}
                             onMouseUp={onSeekCommit}
                             onTouchEnd={onSeekCommit}
-                            className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer group-hover:h-2 transition-all duration-200"
-                            style={{'--progress': `${progress}%`, '--buffer': `${buffer}%`} as React.CSSProperties}
+                            className="absolute inset-0 w-full h-full progress-bar appearance-none bg-transparent cursor-pointer disabled:cursor-not-allowed z-10"
                         />
-                        <style>{`
-                            input[type=range] { -webkit-appearance: none; background: transparent; }
-                            input[type=range]::-webkit-slider-runnable-track {
-                                height: 100%;
-                                background: linear-gradient(to right, 
-                                    white var(--progress), 
-                                    rgba(255,255,255,0.4) var(--progress), 
-                                    rgba(255,255,255,0.4) var(--buffer), 
-                                    rgba(255,255,255,0.2) var(--buffer)
-                                );
-                                border-radius: 9999px;
-                            }
-                            input[type=range]::-webkit-slider-thumb {
-                                -webkit-appearance: none;
-                                height: 16px;
-                                width: 16px;
-                                border-radius: 50%;
-                                background: white;
-                                margin-top: -6px;
-                                opacity: 0;
-                                transition: opacity 0.2s;
-                            }
-                            .group:hover input[type=range]::-webkit-slider-thumb {
-                                opacity: 1;
-                            }
-                        `}</style>
                     </div>
                 </div>
                 
@@ -225,15 +205,19 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
                                 </span>
                             </button>
                             <div className="w-0 group-hover:w-24 transition-all duration-300 overflow-hidden">
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.05"
-                                    value={volume}
-                                    onChange={onVolumeChange}
-                                    className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
-                                />
+                                <div className="relative w-full h-3">
+                                    <div className="absolute w-full h-1 bg-white/30 rounded-full top-1/2 -translate-y-1/2" />
+                                    <div className="absolute h-1 bg-white rounded-full top-1/2 -translate-y-1/2" style={{ width: `${volume * 100}%` }} />
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="1"
+                                        step="0.05"
+                                        value={volume}
+                                        onChange={onVolumeChange}
+                                        className="absolute inset-0 w-full h-full volume-bar appearance-none bg-transparent cursor-pointer z-10"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -245,6 +229,81 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
                     </div>
                 </div>
             </div>
+             <style>{`
+                .progress-bar, .volume-bar {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    background: transparent;
+                    margin: 0;
+                    padding: 0;
+                }
+                .progress-bar:focus, .volume-bar:focus {
+                    outline: none;
+                }
+                
+                /* Webkit (Chrome, Safari, Edge) */
+                .progress-bar::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    height: 16px;
+                    width: 16px;
+                    border-radius: 50%;
+                    background: white;
+                    margin-top: -5px;
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                }
+                .group:hover .progress-bar::-webkit-slider-thumb {
+                    opacity: 1;
+                }
+                .progress-bar:disabled::-webkit-slider-thumb {
+                    opacity: 0 !important;
+                }
+
+                .volume-bar::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    height: 12px;
+                    width: 12px;
+                    border-radius: 50%;
+                    background: white;
+                }
+
+                .progress-bar::-webkit-slider-runnable-track, 
+                .volume-bar::-webkit-slider-runnable-track {
+                    background: transparent;
+                    border: none;
+                }
+                
+                /* Firefox */
+                .progress-bar::-moz-range-thumb {
+                    height: 16px;
+                    width: 16px;
+                    border-radius: 50%;
+                    background: white;
+                    border: none;
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                }
+                .group:hover .progress-bar::-moz-range-thumb {
+                    opacity: 1;
+                }
+                .progress-bar:disabled::-moz-range-thumb {
+                    opacity: 0 !important;
+                }
+
+                .volume-bar::-moz-range-thumb {
+                    height: 12px;
+                    width: 12px;
+                    border-radius: 50%;
+                    background: white;
+                    border: none;
+                }
+
+                .progress-bar::-moz-range-track, 
+                .volume-bar::-moz-range-track {
+                    background: transparent;
+                    border: none;
+                }
+            `}</style>
         </div>
     );
 };
