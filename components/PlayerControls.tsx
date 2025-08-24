@@ -104,6 +104,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const volumeButtonRef = useRef<HTMLDivElement>(null);
     const settingsButtonRef = useRef<HTMLDivElement>(null);
+    console.log(progress, buffer)
     
     return (
         <div className={`absolute inset-0 flex flex-col justify-between text-white transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
@@ -184,10 +185,10 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
                             onMouseUp={onSeekCommit}
                             onTouchEnd={onSeekCommit}
                             className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer group-hover:h-2 transition-all duration-200"
-                            style={{'--progress': `${progress}%`, '--buffer': `${buffer}%`} as React.CSSProperties}
+                            style={{'--progress': `${progress || 0 }%`, '--buffer': `${buffer || 0}%`} as React.CSSProperties}
                         />
                         <style>{`
-                            input[type=range] { -webkit-appearance: none; background: transparent; }
+                            input[type=range] { -webkit-appearance: none; }
                             input[type=range]::-webkit-slider-runnable-track {
                                 height: 100%;
                                 background: linear-gradient(to right, 
