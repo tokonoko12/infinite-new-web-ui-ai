@@ -275,7 +275,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!videoRef.current || typeof dashjs === 'undefined' || isCasting || !streamInfo.manifestUrl) return;
+    if (isCasting) {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      return;
+    }
+    
+    if (!videoRef.current || typeof dashjs === 'undefined') return;
+
+    if (!streamInfo.manifestUrl) {
+      setIsLoading(false);
+      return;
+    }
+
+    if (!streamInfo.manifestUrl.startsWith('http')) {
+        const invalidUrlMessage = `The stream URL received is invalid and cannot be played. This may happen if the content is unavailable in your region or the provider is experiencing issues. URL received: "${streamInfo.manifestUrl}"`;
+        setError(invalidUrlMessage);
+        setIsLoading(false);
+        return;
+    }
+
+    setError(null);
+    setIsLoading(true);
 
     const videoElement = videoRef.current;
     const player = dashjs.MediaPlayer().create();
@@ -645,7 +668,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-80 z-30 text-white text-center p-4 cursor-default">
           <h2 className="text-2xl font-bold text-red-500 mb-4">Playback Error</h2>
-          <p className="mb-6">{error}</p>
+          <p className="mb-6 max-w-xl">{error}</p>
           <button onClick={handleClose} className="bg-red-600 px-6 py-2 rounded font-bold hover:bg-red-700 transition-colors">
             Go Back
           </button>
