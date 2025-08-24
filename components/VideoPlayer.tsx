@@ -267,10 +267,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFullscreenChange);
-    const elem = playerContainerRef.current;
-    if (elem && !document.fullscreenElement) {
-        elem.requestFullscreen().catch(err => console.error(`Fullscreen Error: ${err.message}`));
-    }
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
 
