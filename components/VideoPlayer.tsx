@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as dashjs from 'dashjs';
+import dashjs from 'dashjs';
+import type { 
+  MediaPlayerClass,
+  BitrateInfo,
+  MediaInfo,
+  QualityChangeRenderedEvent,
+  ErrorEvent,
+} from 'dashjs';
 import PlayerControls from './PlayerControls';
 import * as api from '../lib/api';
 import { UpNextOverlay } from './UpNextOverlay';
@@ -31,7 +38,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     nextUpInfo, onPlayNext
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const playerRef = useRef<dashjs.MediaPlayerClass | null>(null);
+  const playerRef = useRef<MediaPlayerClass | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const progressSaveIntervalRef = useRef<number | null>(null);
@@ -65,10 +72,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [lastVolume, setLastVolume] = useState(1);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [qualities, setQualities] = useState<dashjs.BitrateInfo[]>([]);
-  const [currentQuality, setCurrentQuality] = useState(-1);
-  const [textTracks, setTextTracks] = useState<dashjs.MediaInfo[]>([]);
-  const [currentTextTrack, setCurrentTextTrack] = useState<dashjs.MediaInfo | null>(null);
+  const [qualities, setQualities] = useState<BitrateInfo[]>([]);
+  const [textTracks, setTextTracks] = useState<MediaInfo[]>([]);
+  const [currentTextTrack, setCurrentTextTrack] = useState<MediaInfo | null>(null);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1);
 
   const isSeekingRef = useRef(isSeeking);
   useEffect(() => { isSeekingRef.current = isSeeking; }, [isSeeking]);
@@ -145,7 +152,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!videoRef.current || typeof dashjs === 'undefined') return;
+    if (!videoRef.current) return;
 
     if (!streamInfo.manifestUrl) {
       setIsLoading(false);
@@ -195,7 +202,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const onStreamInitialized = () => {
       const videoTrackInfo = player.getTracksFor('video')?.[0];
       if (videoTrackInfo?.bitrateList) {
-          const qualityList: dashjs.BitrateInfo[] = (videoTrackInfo.bitrateList as any[]).map((b, i) => ({
+          const qualityList: BitrateInfo[] = (videoTrackInfo.bitrateList as any[]).map((b, i) => ({
               bitrate: b.bandwidth,
               mediaType: 'video',
               qualityIndex: i,
@@ -212,7 +219,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const tracks = player.getTracksFor('text');
       setTextTracks(tracks || []);
       if (tracks && tracks.length > 0) {
-        let initialTrackIndex = tracks.findIndex((t: dashjs.MediaInfo) => t.lang?.toLowerCase().startsWith('en'));
+        let initialTrackIndex = tracks.findIndex((t: MediaInfo) => t.lang?.toLowerCase().startsWith('en'));
         if (initialTrackIndex === -1) initialTrackIndex = 0;
         player.setTextTrack(initialTrackIndex);
         setCurrentTextTrack(tracks[initialTrackIndex]);
@@ -229,7 +236,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
     };
     
-    const onQualityChange = (e: dashjs.QualityChangeRenderedEvent) => {
+    const onQualityChange = (e: QualityChangeRenderedEvent) => {
         if (e.mediaType === 'video') {
             setCurrentQuality((e as any).newQuality);
         }
@@ -266,7 +273,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
     };
 
-    const onError = (e: dashjs.ErrorEvent) => {
+    const onError = (e: ErrorEvent) => {
       if (e.error && typeof e.error === 'object' && 'code' in e.error && (e.error as any).code === 6001) return; // manifest update on seek
       if (e.error && typeof e.error === 'object' && 'message' in e.error) {
         setError(`Error: ${e.error.message} (code: ${'code' in e.error ? (e.error as any).code : 'N/A'})`);
@@ -443,7 +450,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
   
-  const handleTextTrackChange = (track: dashjs.MediaInfo | null) => {
+  const handleTextTrackChange = (track: MediaInfo | null) => {
     if (playerRef.current) {
         if(track) {
             const trackIdx = textTracks.findIndex(t => t.id === track.id);
