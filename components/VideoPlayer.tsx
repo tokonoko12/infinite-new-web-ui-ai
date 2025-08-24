@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as dashjs from 'dashjs';
+import dashjs from 'dashjs';
 import type { 
   MediaPlayerClass,
   BitrateInfo,
@@ -173,6 +173,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const player = dashjs.MediaPlayer().create();
     playerRef.current = player;
     
+    // Create a request modifier object instance.
+    player.addRequestInterceptor(async (req: any) => {
+  const original = req.url;
+  return {
+    ...req,
+    url: `https://backbone-dahl.onrender.com/proxy/stream?d=${encodeURIComponent(original)}&api_password=test123`,
+  };
+});
+    
     timeOffsetRef.current = streamInfo.seekTime;
 
     player.updateSettings({
@@ -184,6 +193,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
     });
     
+    // The RequestModifier will handle proxying all requests, including the initial manifest.
     player.initialize(videoElement, streamInfo.manifestUrl, true);
     player.setVolume(isMuted ? 0 : volume);
     player.setPlaybackRate(playbackRate);
