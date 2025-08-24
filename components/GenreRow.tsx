@@ -73,7 +73,7 @@ const GenreRow: React.FC<GenreRowProps> = ({ title, items, onContentSelect, genr
       <div className="relative group">
         <div 
           ref={scrollContainerRef}
-          className="flex space-x-4 overflow-x-auto overflow-y-hidden p-4 sm:p-0 -m-4 sm:m-0 no-scrollbar scroll-smooth"
+          className="flex space-x-4 overflow-x-auto overflow-y-hidden p-4 sm:py-2 -m-4 sm:m-0 no-scrollbar scroll-smooth"
         >
           {items.map((item) => (
             <div key={`${item.type}-${item.id}`} className="w-40 md:w-48 flex-shrink-0">
