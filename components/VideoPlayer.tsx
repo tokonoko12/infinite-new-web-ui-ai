@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as dashjs from 'dashjs';
+import dashjs from 'dashjs';
 import type { 
   MediaPlayerClass,
   BitrateInfo,
