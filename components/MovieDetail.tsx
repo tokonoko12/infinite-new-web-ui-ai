@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { DetailedContent, CastMember, Content, Episode, SeasonSummary, StreamCollection, Stream, StreamApiResponse, PlayableContent } from '../types';
+import type { DetailedContent, CastMember, Content, Episode, SeasonSummary, StreamCollection, Stream, StreamApiResponse, PlayableContent, PlayableStreamResponse } from '../types';
 import { API_KEY, BASE_URL, IMAGE_BASE_URL, BACKDROP_BASE_URL, GENRE_MAP, STREAM_BASE_URL } from '../constants';
 import CastSection from './CastSection';
 import GenreRow from './GenreRow';
@@ -17,6 +17,84 @@ interface ContentDetailProps {
   onPlay: (content: PlayableContent) => void;
 }
 
+// --- Download Modal Component ---
+const getQualityRankModal = (quality: string): number => {
+    const q = quality.toLowerCase();
+    if (q.includes('4k') || q.includes('2160')) return 1;
+    if (q.includes('1080')) return 2;
+    if (q.includes('720')) return 3;
+    const numericPart = parseInt(q, 10);
+    if (!isNaN(numericPart)) {
+        return 1000 - numericPart;
+    }
+    return 1000;
+};
+
+interface DownloadSelectorModalProps {
+    streams: StreamCollection;
+    onClose: () => void;
+    onSelect: (stream: Stream) => void;
+    contentTitle: string;
+}
+
+const DownloadSelectorModal: React.FC<DownloadSelectorModalProps> = ({ streams, onClose, onSelect, contentTitle }) => {
+    const availableQualities = Object.keys(streams)
+        .filter(q => streams[q] && streams[q].length > 0)
+        .sort((a, b) => getQualityRankModal(a) - getQualityRankModal(b));
+    
+    const [selectedQuality, setSelectedQuality] = useState<string | null>(availableQualities[0] || null);
+
+    return (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="relative w-full max-w-xl h-auto max-h-[65vh] bg-gray-900/95 backdrop-blur-lg rounded-lg shadow-2xl flex flex-col transition-all duration-300 ease-in-out" onClick={e => e.stopPropagation()}>
+                <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
+                    <div>
+                        <h1 className="text-lg font-semibold text-white">Select Download Source</h1>
+                        <p className="text-sm text-gray-400 truncate max-w-sm">{contentTitle}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10" aria-label="Close selection">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </header>
+                <main className="p-4 sm:p-6 flex flex-col flex-grow min-h-0">
+                    <div className="flex border-b border-gray-700 mb-4 flex-shrink-0 overflow-x-auto no-scrollbar">
+                        {availableQualities.map(q => (
+                            <button 
+                                key={q}
+                                onClick={() => setSelectedQuality(q)}
+                                className={`px-4 py-2 font-semibold transition-colors focus:outline-none flex-shrink-0 ${selectedQuality === q ? 'text-white border-b-2 border-white' : 'text-gray-400 hover:text-white border-b-2 border-transparent'}`}
+                                aria-pressed={selectedQuality === q}
+                            >
+                                {q}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex-grow overflow-y-auto no-scrollbar">
+                        {selectedQuality && streams[selectedQuality] ? (
+                            <ul className="space-y-2 pr-2">
+                                {streams[selectedQuality].map((s, index) => (
+                                    <li key={`${selectedQuality}-${index}`}>
+                                        <button 
+                                            onClick={() => onSelect({...s, quality: selectedQuality})} 
+                                            className="w-full text-left p-3 rounded-md transition-colors text-gray-300 bg-gray-800 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white flex items-center gap-3"
+                                        >
+                                            <span className="material-symbols-outlined text-gray-400">download</span>
+                                            <span className="text-sm font-medium whitespace-pre-wrap flex-grow">{s.title}</span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-gray-400 text-center pt-4">Select a quality to see available download links.</p>
+                        )}
+                    </div>
+                </main>
+            </div>
+        </div>
+    );
+};
+
+
 const getQualityRank = (quality: string): number => {
     const q = quality.toLowerCase();
     if (q.includes('4k') || q.includes('2160')) return 1;
@@ -24,9 +102,9 @@ const getQualityRank = (quality: string): number => {
     if (q.includes('720')) return 3;
     const numericPart = parseInt(q, 10);
     if (!isNaN(numericPart)) {
-        return 1000 - numericPart; // Sorts numeric qualities (e.g. 480p) descending
+        return 1000 - numericPart;
     }
-    return 1000; // Place other non-numeric qualities at the end
+    return 1000;
 };
 
 const ContentDetail: React.FC<ContentDetailProps> = ({ contentId, contentType, onBack, onContentSelect, onPlay }) => {
@@ -45,6 +123,9 @@ const ContentDetail: React.FC<ContentDetailProps> = ({ contentId, contentType, o
   const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
   const [loadingStreams, setLoadingStreams] = useState(false);
   const [isStreamSelectorVisible, setIsStreamSelectorVisible] = useState(false);
+  const [isDownloadSelectorVisible, setIsDownloadSelectorVisible] = useState(false);
+  const [isPreparingDownload, setIsPreparingDownload] = useState(false);
+
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -242,6 +323,49 @@ const ContentDetail: React.FC<ContentDetailProps> = ({ contentId, contentType, o
     setIsStreamSelectorVisible(false);
   };
   
+  const handleDownloadSelect = async (stream: Stream) => {
+    if (!content) return;
+
+    setIsPreparingDownload(true);
+    setIsDownloadSelectorVisible(false); // Close modal immediately
+
+    try {
+        const res = await fetch(`${STREAM_BASE_URL}/stream?url=${encodeURIComponent(stream.url)}`);
+        if (!res.ok) throw new Error(`Server error: ${res.statusText}`);
+        
+        const data: PlayableStreamResponse = await res.json();
+        
+        const downloadUrl = data.streams?.main;
+        if (!downloadUrl) {
+            throw new Error('No direct download link was found for this source.');
+        }
+
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+
+        // Sanitize title for filename
+        let filename = content.title.replace(/[^a-z0-9\s-]/gi, '').replace(/\s+/g, '.');
+        if (contentType === 'tv' && selectedEpisode) {
+            const season = String(selectedEpisode.seasonNumber).padStart(2, '0');
+            const episode = String(selectedEpisode.episodeNumber).padStart(2, '0');
+            filename += `.S${season}E${episode}`;
+        }
+        filename += `.${stream.quality || '720p'}.mp4`;
+
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode?.removeChild(link);
+
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        // Using alert for simplicity as there's no toast component
+        alert(`Download Failed\n\n${errorMessage}`);
+    } finally {
+        setIsPreparingDownload(false);
+    }
+  };
+
   const handleEpisodeSelect = (episode: Episode) => {
       setSelectedEpisode(episode);
   };
@@ -249,6 +373,15 @@ const ContentDetail: React.FC<ContentDetailProps> = ({ contentId, contentType, o
   if (loading) {
     return <ContentDetailSkeleton />;
   }
+  
+  if (isPreparingDownload) {
+    return (
+        <div className="fixed inset-0 z-[110] bg-black/80 flex flex-col justify-center items-center h-full text-center p-4">
+            <LoadingIndicator message="Preparing download..." />
+        </div>
+    );
+  }
+
   if (error || !content) {
     return <div className="min-h-screen bg-black flex justify-center items-center text-red-400">{error || 'Content not found.'}</div>;
   }
@@ -290,6 +423,14 @@ const ContentDetail: React.FC<ContentDetailProps> = ({ contentId, contentType, o
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 flex-shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                       </svg>
+                  </button>
+                  <button
+                      onClick={() => setIsDownloadSelectorVisible(true)}
+                      className="bg-white/10 text-white font-bold py-3 px-4 rounded-md backdrop-blur-sm border border-white/30 hover:bg-white/20 transition-colors flex items-center justify-center"
+                      title="Download"
+                      aria-label="Download content"
+                  >
+                      <span className="material-symbols-outlined">download</span>
                   </button>
               </>
           ) : (
@@ -374,6 +515,14 @@ const ContentDetail: React.FC<ContentDetailProps> = ({ contentId, contentType, o
               currentStream={selectedStream}
               onClose={() => setIsStreamSelectorVisible(false)}
               onSelect={handleStreamSelect}
+          />
+      )}
+      {isDownloadSelectorVisible && streams && (
+          <DownloadSelectorModal
+              streams={streams}
+              onClose={() => setIsDownloadSelectorVisible(false)}
+              onSelect={handleDownloadSelect}
+              contentTitle={content.title}
           />
       )}
     </main>

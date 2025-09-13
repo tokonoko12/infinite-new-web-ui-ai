@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as dashjs from 'dashjs';
+import dashjs from 'dashjs';
 import type { 
   MediaPlayerClass,
   BitrateInfo,
@@ -42,17 +42,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const controlsTimeoutRef = useRef<number | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const progressSaveIntervalRef = useRef<number | null>(null);
-  const timeOffsetRef = useRef(initialSeekTime);
   
   const [selectedAudioLanguage, setSelectedAudioLanguage] = useState('en');
-
-  const getUrlWithTime = (baseUrl: string, time: number) => {
-    if (time > 1) {
-        const [base] = baseUrl.split('?');
-        return `${base}?t=${Math.round(time)}`;
-    }
-    return baseUrl;
-  };
 
   const [streamInfo, setStreamInfo] = useState({ manifestUrl: '', seekTime: initialSeekTime });
   const [totalDuration, setTotalDuration] = useState(totalDurationProp || 0);
@@ -100,7 +91,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setSelectedAudioLanguage(lang);
         }
         setStreamInfo({ 
-            manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', lang), initialSeekTime), 
+            manifestUrl: urlTemplate.replace('{audio}', lang), 
             seekTime: initialSeekTime 
         });
     }
@@ -182,8 +173,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 });
     
-    timeOffsetRef.current = streamInfo.seekTime;
-
     player.updateSettings({
         streaming: {
             buffer: {
@@ -225,6 +214,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       
       player.updateSettings({ streaming: { abr: { autoSwitchBitrate: { video: true } } } });
       setCurrentQuality(-1); // -1 for Auto
+
+      if (streamInfo.seekTime > 1) {
+          player.seek(streamInfo.seekTime);
+      }
       
       const tracks = player.getTracksFor('text');
       setTextTracks(tracks || []);
@@ -257,9 +250,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const playerTime = playerRef.current.time();
       const durationForCalc = totalDurationRef.current;
       if (durationForCalc > 0 && !isNaN(playerTime)) {
-        const absoluteTime = timeOffsetRef.current + playerTime;
-        setCurrentTime(absoluteTime);
-        setProgress((absoluteTime / durationForCalc) * 100);
+        setCurrentTime(playerTime);
+        setProgress((playerTime / durationForCalc) * 100);
       }
     };
     
@@ -269,7 +261,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if(dur > 0) {
           const bufferLevel = playerRef.current.getBufferLength('video');
           const playerTime = playerRef.current.time();
-          const bufferProgress = ((timeOffsetRef.current + playerTime + bufferLevel) / dur) * 100;
+          const bufferProgress = ((playerTime + bufferLevel) / dur) * 100;
           setBuffer(bufferProgress);
       }
     };
@@ -317,7 +309,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
       playerRef.current = null;
     };
-  }, [streamInfo.manifestUrl]);
+  }, [streamInfo]);
 
   const hideControls = () => {
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -364,20 +356,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleSeekCommit = () => {
     setIsSeeking(false);
-    if (totalDuration <= 0) return;
+    if (totalDuration <= 0 || !playerRef.current) return;
     const newTime = (progress / 100) * totalDuration;
-    
-    timeOffsetRef.current = newTime;
-    setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), newTime), seekTime: newTime });
+    playerRef.current.seek(newTime);
     setCurrentTime(newTime);
     saveProgress(false, newTime);
   };
 
   const handleSkip = (amount: number) => {
-    if (totalDuration > 0) {
+    if (totalDuration > 0 && playerRef.current) {
       const newTime = Math.max(0, Math.min(totalDuration, currentTime + amount));
-      timeOffsetRef.current = newTime;
-      setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), newTime), seekTime: newTime });
+      playerRef.current.seek(newTime);
       setCurrentTime(newTime);
       setProgress((newTime / totalDuration) * 100);
       saveProgress(false, newTime);
@@ -386,10 +375,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleReplay = () => {
     setIsFinished(false);
-    setIsLoading(true);
     setIsPlaying(true);
-    timeOffsetRef.current = 0;
-    setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', selectedAudioLanguage), 0), seekTime: 0 });
+    if (playerRef.current) {
+        playerRef.current.seek(0);
+        playerRef.current.play();
+    } else {
+        setStreamInfo(prev => ({ ...prev, seekTime: 0 }));
+    }
   };
 
   const handleToggleFullscreen = () => {
@@ -479,9 +471,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (urlTemplate) {
         const newTime = currentTimeRef.current;
         setSelectedAudioLanguage(langKey);
-        // Setting streamInfo will trigger the useEffect to re-initialize the player
-        timeOffsetRef.current = newTime;
-        setStreamInfo({ manifestUrl: getUrlWithTime(urlTemplate.replace('{audio}', langKey), newTime), seekTime: newTime });
+        setStreamInfo({
+            manifestUrl: urlTemplate.replace('{audio}', langKey),
+            seekTime: newTime
+        });
     }
   };
 
@@ -510,6 +503,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
+      {isLoading && (
+         <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-10 pointer-events-none">
+            <svg className="animate-spin text-white w-24 h-24 sm:w-32 sm:h-32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <circle 
+                    className="stroke-current opacity-20"
+                    cx="50" cy="50" r="45" fill="none" strokeWidth="6"
+                />
+                <circle 
+                    className="stroke-current"
+                    cx="50" cy="50" r="45" fill="none" strokeWidth="6"
+                    strokeDasharray="140, 283"
+                    strokeLinecap="round"
+                />
+            </svg>
+         </div>
+      )}
+
       {upNextDisplayInfo || (isFinished && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 z-20" onClick={(e) => { e.stopPropagation(); handleReplay(); }}>
           <button className="flex flex-col items-center text-white hover:text-gray-300 transition-colors duration-200">
@@ -526,6 +536,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             isFinished={isFinished}
             progress={progress}
             onSeekChange={handleSeekChange}
+            // Fix: Pass handleSeekCommit instead of the undefined onSeekCommit.
             onSeekCommit={handleSeekCommit}
             onPlayPause={handlePlayPause}
             isPlaying={isPlaying}

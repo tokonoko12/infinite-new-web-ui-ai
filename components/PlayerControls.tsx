@@ -137,20 +137,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = (props) => {
                     <span className="material-symbols-outlined text-4xl sm:text-5xl">replay_10</span>
                 </button>
                 <div className="relative flex items-center justify-center w-24 h-24 sm:w-32 sm:h-32">
-                     {isLoading && (
-                        <svg className="absolute animate-spin text-white w-full h-full" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                            <circle 
-                                className="stroke-current opacity-20"
-                                cx="50" cy="50" r="45" fill="none" strokeWidth="6"
-                            />
-                            <circle 
-                                className="stroke-current"
-                                cx="50" cy="50" r="45" fill="none" strokeWidth="6"
-                                strokeDasharray="140, 283"
-                                strokeLinecap="round"
-                            />
-                        </svg>
-                    )}
                     <button 
                         onClick={onPlayPause} 
                         className="p-3 sm:p-4 bg-black/40 rounded-full hover:bg-white/20 transition-colors backdrop-blur-sm disabled:cursor-default flex items-center justify-center" 
