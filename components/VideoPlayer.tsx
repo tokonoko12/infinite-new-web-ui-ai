@@ -164,15 +164,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const player = dashjs.MediaPlayer().create();
     playerRef.current = player;
     
-    // Create a request modifier object instance.
-    player.addRequestInterceptor(async (req: any) => {
-  const original = req.url;
-  return {
-    ...req,
-    url: `https://backbone-dahl.onrender.com/proxy/stream?d=${encodeURIComponent(original)}&api_password=test123`,
-  };
-});
-    
     player.updateSettings({
         streaming: {
             buffer: {
@@ -182,7 +173,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
     });
     
-    // The RequestModifier will handle proxying all requests, including the initial manifest.
     player.initialize(videoElement, streamInfo.manifestUrl, true);
     player.setVolume(isMuted ? 0 : volume);
     player.setPlaybackRate(playbackRate);
@@ -536,7 +526,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             isFinished={isFinished}
             progress={progress}
             onSeekChange={handleSeekChange}
-            // Fix: Pass handleSeekCommit instead of the undefined onSeekCommit.
             onSeekCommit={handleSeekCommit}
             onPlayPause={handlePlayPause}
             isPlaying={isPlaying}
