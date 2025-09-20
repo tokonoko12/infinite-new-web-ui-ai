@@ -340,8 +340,10 @@ const ContentDetail: React.FC<ContentDetailProps> = ({ contentId, contentType, o
             throw new Error('No direct download link was found for this source.');
         }
 
+        const proxyDownloadUrl = `https://backbone-dahl.onrender.com/proxy/stream?api_password=test123&d=${encodeURIComponent(downloadUrl)}`;
+
         const link = document.createElement('a');
-        link.href = downloadUrl;
+        link.href = proxyDownloadUrl;
 
         // Sanitize title for filename
         let filename = content.title.replace(/[^a-z0-9\s-]/gi, '').replace(/\s+/g, '.');

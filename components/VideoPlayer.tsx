@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import dashjs from 'dashjs';
+import MediaPlayer from 'dashjs';
 import type { 
   MediaPlayerClass,
   BitrateInfo,
@@ -161,9 +161,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsLoading(true);
 
     const videoElement = videoRef.current;
-    const player = dashjs.MediaPlayer().create();
+    // FIX: The MediaPlayer factory function must be called to get an instance before calling create().
+    const player = MediaPlayer.MediaPlayer().create();
     playerRef.current = player;
     
+    // FIX: The 'addRequestFilter' method was removed in dash.js v4.
+    // Use the 'RequestModifier' component extension to modify request URLs instead.
+    player.extend('RequestModifier', function () {
+        return {
+            modifyRequestURL: (url: string, request: any) => {
+                // As per user instruction, proxy manifest and segment requests
+                const requestTypesToProxy = ['Manifest', 'MediaSegment', 'InitializationSegment'];
+                if (requestTypesToProxy.includes(request.type)) {
+                    const proxyUrl = "https://backbone-dahl.onrender.com/proxy/stream?api_password=test123&d=";
+                    return proxyUrl + encodeURIComponent(url);
+                }
+                return url;
+            }
+        };
+    }, true);
+
     player.updateSettings({
         streaming: {
             buffer: {
@@ -276,20 +293,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setIsLoading(false);
     };
     
-    player.on(dashjs.MediaPlayer.events.PLAYBACK_STARTED, onPlaybackStarted);
-    player.on(dashjs.MediaPlayer.events.PLAYBACK_PAUSED, onPlaybackPaused);
-    player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, onStreamInitialized);
-    player.on(dashjs.MediaPlayer.events.PLAYBACK_METADATA_LOADED, onMetadataLoaded);
-    player.on(dashjs.MediaPlayer.events.PLAYBACK_TIME_UPDATED, onTimeUpdate);
-    player.on(dashjs.MediaPlayer.events.BUFFER_LEVEL_UPDATED, onBufferLevelUpdated);
-    player.on(dashjs.MediaPlayer.events.PLAYBACK_ENDED, onPlaybackEnded);
-    player.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, onQualityChange);
-    player.on(dashjs.MediaPlayer.events.ERROR, onError);
+    player.on(MediaPlayer.MediaPlayer.events.PLAYBACK_STARTED, onPlaybackStarted);
+    player.on(MediaPlayer.MediaPlayer.events.PLAYBACK_PAUSED, onPlaybackPaused);
+    player.on(MediaPlayer.MediaPlayer.events.STREAM_INITIALIZED, onStreamInitialized);
+    player.on(MediaPlayer.MediaPlayer.events.PLAYBACK_METADATA_LOADED, onMetadataLoaded);
+    player.on(MediaPlayer.MediaPlayer.events.PLAYBACK_TIME_UPDATED, onTimeUpdate);
+    player.on(MediaPlayer.MediaPlayer.events.BUFFER_LEVEL_UPDATED, onBufferLevelUpdated);
+    player.on(MediaPlayer.MediaPlayer.events.PLAYBACK_ENDED, onPlaybackEnded);
+    player.on(MediaPlayer.MediaPlayer.events.QUALITY_CHANGE_RENDERED, onQualityChange);
+    player.on(MediaPlayer.MediaPlayer.events.ERROR, onError);
 
     // Show loading indicator during buffering
-    player.on(dashjs.MediaPlayer.events.PLAYBACK_WAITING, () => setIsLoading(true));
-    player.on(dashjs.MediaPlayer.events.PLAYBACK_PLAYING, () => setIsLoading(false));
-    player.on(dashjs.MediaPlayer.events.CAN_PLAY, () => setIsLoading(false));
+    player.on(MediaPlayer.MediaPlayer.events.PLAYBACK_WAITING, () => setIsLoading(true));
+    player.on(MediaPlayer.MediaPlayer.events.PLAYBACK_PLAYING, () => setIsLoading(false));
+    player.on(MediaPlayer.MediaPlayer.events.CAN_PLAY, () => setIsLoading(false));
 
     return () => {
       if (progressSaveIntervalRef.current) clearInterval(progressSaveIntervalRef.current);

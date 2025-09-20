@@ -67,7 +67,7 @@ const StreamPlayer: React.FC<StreamPlayerProps> = ({ content: initialContent, on
                     durationToSet = data.duration;
                     setAudioLanguages(data.audio_lang || null);
                     if (data.streams && data.streams.Original) {
-                       return `${STREAM_BASE_URL}/stream?url=${encodeURIComponent(data.streams.Original)}`;
+                       return data.streams.Original;
                     }
                     // Per user instruction, only use the `Original` stream as it contains the MPD manifest.
                     return null;
